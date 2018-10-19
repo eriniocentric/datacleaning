@@ -1,0 +1,72 @@
+#! /bin/bash
+WORKDIR=/work/05350/ecooper/maverick
+
+#first check if any science frames were taken this night. Exit script if not.
+if ! ls /work/03946/hetdex/maverick/$1/virus/virus00000*/*/virus/*sci.fits 1> /dev/null 2>&1
+    then
+    echo "No science frames exist"
+    echo "EXITING SCRIPT"
+    exit 1
+fi
+
+#create redutions scripts using Karl's rsetup code. These are stored for
+#reference in scripts (twilight script) and scripts/allscripts (science scripts) 
+cd $WORKDIR/scripts
+~gebhardt/bin/rsetup $1
+
+#copy scripts to your working directory (we are all using red1 currently)
+cd $WORKDIR/red1
+cp $WORKDIR/scripts/rtwi$1* .
+cp $WORKDIR/scripts/allscripts/$1/rscin* .
+cp $WORKDIR/scripts/allscripts/$1/r*.batch .
+#copy the runall batch job to the shifts directory
+cp $WORKDIR/scripts/allscripts/$1/r*.co2 shifts/
+
+#check to see if the twilight files exists. If it does not, then user is prompted to 
+#enter the date of another nearby night (YYYYMMDD) with a twilight observed
+if ls /work/03946/hetdex/maverick/$1/virus/virus*/*/virus/*twi.fits 1> /dev/null 2>&1
+    then
+    echo "Twilight file exists"
+
+    jobtwi=$(sbatch  rtwi$1.slurm)
+    jobtwi=${jobtwi:(-6)}
+
+    echo "Reducing twilight. Slurm Job ID is $jobtwi"
+    
+else
+    echo "No twilight was taken this night."
+    read -p "Choose a twilight from another date (YYYYMMDD): " twidate
+    
+    cp $WORKDIR/scripts/rtwi$twidate* .
+
+    echo "Twilight from $twidate choosen"
+    jobtwi=$(sbatch  rtwi$twidate.slurm)
+    jobtwi=${jobtwi:(-6)}
+
+    echo "Reducing twilight. Slurm Job ID is $jobtwi"
+
+    #change rscin files to point to new twilight
+    sed -i s/"-td $1"/"-td $twidate"/ rscin$1v???
+    sed -i s/"-to "/"-to 001 "/ rscin$1v???
+fi
+
+sed -i s/"sbatch"/"sbatch --dependency=afterok:$jobtwi"/ r$1.batch
+echo "Sending science frames to slurm dependent on twilight reduction."   
+r$1.batch
+
+
+cd $WORKDIR/red1/shifts
+
+cp template.slurm rco2$1.slurm
+nfiles=`wc r$1.co2 | awk '{print $1}'`
+
+echo "Sending singleton dependency slurm job to determine astrometry for $nfiles shots"
+
+sed -i s/"-n 100"/"-n $nfiles"/ rco2$1.slurm 
+sed -i s/"template"/"r$1.co2"/ rco2$1.slurm
+
+#change runall to run locally on newly reduced files
+
+sed -i s/"runall"/"runalllocal"/ r$1.co2
+
+sbatch --dependency=singleton rco2$1.slurm

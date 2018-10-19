@@ -1,0 +1,88 @@
+#! /bin/bash
+# Change this to your working directory on maverick
+#
+WORKDIR=/work/05350/ecooper/maverick
+#
+#and do this once to get libraries on your drive
+#
+#cd $WORKDIR/detect/
+#mkdir sed
+#cd sed
+#cp -r /work/00115/gebhardt/maverick/detect/sed/* .
+#mkdir output
+#
+#
+#takes a input DATE and makes a detect catalog for each shot taken that night
+#
+line=$1
+
+echo "Date is $line"
+cd sed
+#copy over rDATE.batch file from allscripts so get DATEvSHOT list
+cp $WORKDIR/scripts/allscripts/$line/r*batch $line.shots
+sed -i s/'sbatch rscin'// $line.shots
+sed -i s/'\.slurm'// $line.shots
+
+#generate model SEDs from stellar libraries for each star in a given shot
+
+awk -v WORKDIR="$WORKDIR" '{printf "python /work/00115/gebhardt/maverick/sed/stellarSEDfits/quick_fit.py --filename %s/red1/shifts/%s/%s.ifu --ebv 0.02 --outfolder output \n",WORKDIR,$1,$1}' $line.shots > r$line.qf
+chmod a+x r$line.qf
+
+nfiles=`wc r$line.qf | awk '{print $1}'`
+
+if [ "$nfiles" -eq 0 ]; then
+    echo "No science frames exist"
+    echo "EXITING SCRIPT"
+    exit 1
+fi
+
+#run as a slurm job, store job number so rsetstar runs dependent on this task finishing
+cp ~ecooper/bin/template.slurm qf$line.slurm
+nfiles=`wc r$line.qf | awk '{print $1}'`
+
+sed -i s/'-n 100'/"-n $nfiles"/ qf$line.slurm
+sed -i s/'template'/"r$line.qf"/ qf$line.slurm
+sed -i s/'-t 04:00:00'/'-t 00:30:00'/ qf$line.slurm
+
+jobqf=$(sbatch  qf$line.slurm)
+jobqf=${jobqf:(-6)}
+echo "Generating stellar SED models, submitting job $jobqf for $nfiles shots on $line"
+
+cd ..
+
+#run rsetstar (copy once and make sure it has the right path to the shifts directory and have this line
+#sed -i s/"00115\/gebhardt"/"05350\/ecooper"/ rdostar)
+#cp /work/00115/gebhardt/maverick/detect/rsetstar .
+cp rsetstarEMC rsetstar
+awk '{print "rsetstar",$1}' sed/$line.shots > r$line.rsstar
+sed -i s/"v"/" "/ r$line.rsstar
+chmod a+x r$line.rsstar
+#this will send a slurm job
+sed -i s/"sbatch"/"sbatch --dependency=afterok:$jobqf"/g rsetstar
+r$line.rsstar
+
+#now measure throughput. Put tp0+tp0b executables in new run to run with dependency on rsetstar finishing
+
+cp /work/00115/gebhardt/maverick/detect/rgettp0 .
+awk '{print "rgettp0",$1}' sed/$line.shots > r$line.tp0
+sed -i s/"v"/" "/ r$line.tp0
+chmod a+x r$line.tp0
+echo "r$line.tp0" > tp0.run
+
+#cp /work/00115/gebhardt/maverick/detect/rgettp0b .
+#add these lines to rgettp0b after the copy command (see my rgettp0b_emc)
+#sed -i s/'00115'/'05350'/ rgettp3
+#sed -i s/'gebhardt'/'ecooper'/ rgettp3
+awk '{print "rgettp0b",$1}' sed/$line.shots > r$line.tp0b
+sed -i s/"v"/" "/ r$line.tp0b
+chmod a+x r$line.tp0b
+echo "r$line.tp0b" > tp0b.run
+
+cat tp0.run tp0b.run > tp$line.run
+cp ~ecooper/bin/template.slurm tp$line.slurm
+sed -i s/'-n 100'/'-n 1'/ tp$line.slurm
+sed -i s/'template'/"tp$line.run"/ tp$line.slurm
+sed -i s/'-t 04:00:00'/'-t 00:30:00'/ tp$line.slurm   
+
+#send final part as a singleton job so it only runs after all the rsetstar jobs are done
+sbatch --dependency=singleton tp$line.slurm

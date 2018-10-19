@@ -1,0 +1,43 @@
+#! /bin/bash
+# Change this to your working directory on maverick
+#
+WORKDIR=/work/05350/ecooper/maverick
+#
+#
+#takes a input DATE and makes a detect catalog for each shot taken that night
+#
+line=$1
+
+echo "Date is $line"
+cp $WORKDIR/scripts/allscripts/$line/*.det* .
+	
+cp ~ecooper/bin/template.slurm rdet1_$1.slurm
+nfiles=`wc r$1.det1 | awk '{print $1}'`
+    
+sed -i s/"-n 100"/"-n $nfiles"/ rdet1_$1.slurm 
+sed -i s/"template"/"r$1.det1"/ rdet1_$1.slurm
+
+#jobset0=$(sbatch  rdet1_$1.slurm)
+#jobset0=${jobset0:(-6)}
+#echo "$jobset0"
+
+#doing rallt.slurm job seperate from rset0 (so make sure the line sbatch rallt.slurm is commented out in the rset0 comman
+
+#create commmand do rallt for each shot for given date
+
+#awk -v jobnum="$jobset0" '{printf "cd %sv%s; sbatch --dependency=afterok:%s rallt.slurm; cd ..\n",$2,$3,jobnum}' r$1.det1 > rallt$1.batch
+awk -v '{printf "cd %sv%s; rallt.slurm; cd ..\n",$2,$3}' r$1.det1 > rallt$1.batch 
+chmod a+x rallt$1.batch
+
+#leaving this step to execute separately
+#rallt$1.batch
+
+
+#now make the full detect catalogs (t5all) using rrun2, run this as a singleton dependency
+cp ~ecooper/bin/template.slurm rdet2_$1.slurm	
+sed -i s/"-n 100"/"-n $nfiles"/ rdet2_$1.slurm
+sed -i s/"template"/"r$1.det2"/ rdet2_$1.slurm
+
+#can execute separately
+#sbatch --dependency=singleton rdet2_$1.slurm
+       

@@ -1,0 +1,62 @@
+#! /bin/bash
+#this is a call of reduceonenight without running the reductions to generate the scripts for that night and put them in their proper place in scripts/allscripts
+
+WORKDIR=/work/05350/ecooper/maverick
+
+#first check if any science frames were taken this night. Exit script if not.
+if ! ls /work/03946/hetdex/maverick/$1/virus/virus00000*/*/virus/*sci.fits 1> /dev/null 2>&1
+    then
+    #check if data is tarred up
+#    if ! ls /work/03946/hetdex/maverick/$1/virus/virus*.tar 1> /dev/null 2>&1
+#	then
+	echo "No science frames exist"
+	echo "EXITING SCRIPT"
+	exit 1
+#    fi
+fi
+
+#create redutions scripts using Karl's rsetup code. These are stored for
+#reference in scripts/allscripts/DATE
+
+cd $WORKDIR/scripts
+~gebhardt/bin/rsetup $1
+
+#copy scripts to your working directory (we are all using red1 currently)
+cd $WORKDIR/red1
+cp $WORKDIR/scripts/allscripts/$1/rtwi$1* .
+cp $WORKDIR/scripts/allscripts/$1/rscin* .
+cp $WORKDIR/scripts/allscripts/$1/r*.batch .
+#copy the runall batch job to the shifts directory
+cp $WORKDIR/scripts/allscripts/$1/r*.co2 shifts/
+
+#check to see if the twilight files exists. If it does not, then user is prompted to 
+#enter the date of another nearby night (YYYYMMDD) with a twilight observed
+if ls /work/03946/hetdex/maverick/$1/virus/virus*/*/virus/*twi.fits 1> /dev/null 2>&1
+    then
+    echo "Twilight file exists"
+
+#    jobtwi=$(sbatch  rtwi$1.slurm)
+#    jobtwi=${jobtwi:(-6)}
+
+#    echo "Reducing twilight. Slurm Job ID is $jobtwi"
+    
+else
+    echo "No twilight was taken this night."
+    read -p "Choose a twilight from another date (YYYYMMDD): " twidate
+    
+    cp $WORKDIR/scripts/allscripts/$1/rtwi$twidate* .
+
+    echo "Twilight from $twidate choosen"
+#    jobtwi=$(sbatch  rtwi$twidate.slurm)
+#    jobtwi=${jobtwi:(-6)}
+
+    echo "Reducing twilight. Slurm Job ID is $jobtwi"
+
+    #change rscin files to point to new twilight
+    sed -i s/"-td $1"/"-td $twidate"/ rscin$1v???
+    sed -i s/"-to "/"-to 001 "/ rscin$1v???
+
+    #copy updated rscin files to scripts/allscripts
+    cp rscin$1v??? $WORKDIR/scripts/allscripts/$1/
+fi
+

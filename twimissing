@@ -1,0 +1,22 @@
+#for an input datelist checks if the twilight is missing from the rscin script
+#call from scripts/allscripts
+
+cat $1 | while read line
+do
+#	echo "Date is $line"
+	cd $line
+	grep '\-to  \-te' rscin"$line"v??? > tmp
+	if [ -s tmp ] 
+	   then
+#		echo "No twilight was taken on $line. Enter another date (YYYYMMDD):"
+		echo "No twilight was taken on $line"		
+    	#    	read -p "Choose a twilight from another date (YYYYMMDD): " twidate
+	    	
+#	    sed -i s/"-td $line"/"-td $twidate"/ rscin"$line"v???
+#	    sed -i s/"-to "/"-to 001 "/ rscin"$line"v???
+	    echo "Twilight switched from $line to $twidate"
+	    cp rscin"$line"v??? ../twilightchange/
+	    
+	fi    	   	  
+	cd ..
+done

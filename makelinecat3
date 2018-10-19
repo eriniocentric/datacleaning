@@ -1,0 +1,67 @@
+#makelinecat takes an input catalog as an argument 
+#[arg1]=input catalog should be in the form of ID RA(deg) DEC(deg) WAVE(AA)  
+#[arg2]=IDfotcatalog. Catalog will be generated as ID.cat in the directory ID/
+# if the directory ID exists, it will be deleted
+#[arg3]=aperture radius (arcsec), I usually do 2"
+#[arg4]=wavelength region to search and fit line. I usually do 50AA
+
+
+filename="$1"
+radius=$3
+dwave=$4
+
+rm -rf $2
+mkdir $2
+
+cp $1 $2/
+cd $2
+
+#sort input file for catalog matching later (this is not a numeric sort to match directory sorting)
+sort $filename > inputsort.txt
+
+while IFS=" "  read -r id ra dec wave extra
+do
+	case $id in
+	     ''|\#*) continue ;;         # skip blank lines and lines starting with #
+   	esac
+	echo "$id $ra $dec $wave"
+	~gebhardt/bin/rsp3 $ra $dec $radius $wave $dwave $id $2  
+done < inputsort.txt       
+
+#run fitonesiga to do 2D fitting of line and get calibrated line fluxes
+#first generate a list of sources as input for fitonesiga
+
+grep . $2*/*2d.res | sed s/"\/"/" "/ | awk 'if($8>4.99) {print $1,$8,$4}' > inlist
+
+fitema << eof
+$2_fitonesiga.ps/vcps
+eof
+
+#remove white space and comments from input file
+
+sed -e '/\s*#.*$/d' -e '/^\s*$/d' inputsort.txt > tmpinput
+
+#combine lines.out (output from fitonesiga for all detected objects)
+paste inlist tmpinput lines.out > tmp
+sed -i s/"$2_"// tmp
+awk '$1!=$3 {print "WARNING!!: This line does not match in the output catalog:",$1,"=",$3}' tmp
+
+#generate catalog for sources with SN2D > 5 only
+#
+#output catalog as ID RA DEC WAVEIN WAVEFIT FLUX SIGMA ERR SN2D CONT
+
+#have to switch out NaNs to a numeric value
+sed -i 's/NaN/-99/g' tmp
+#awk '$12>5 {print $3,$4,$5,$7,$8,$9,$10,$11,$12,$13}' tmp > tmp2
+awk '{print $3,$4,$5,$7,$8,$9,$10,$11,$12,$13}' tmp > tmp2
+echo '#ID RA DEC  WAVEIN  WAVEFIT  FLUX  SIGMA  ERR  SN2D  CONT' | cat tmp2 > $2_output.cat
+
+#plot up only good lines in fitonesiga now.
+#awk '$12>5.0 {print $1,$12}' tmp > inlist
+#fitonesiga << eof
+#$2_fitonesiga.ps/vcps
+#eof
+
+
+cp $2_output.cat ../
+cd ../

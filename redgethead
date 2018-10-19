@@ -1,0 +1,1 @@
+~gebhardt/wcs/wcstools-3.9.2/bin/gethead -p /work/03946/hetdex/maverick/red1/reductions/$1/virus/virus000*/*/virus/multi_???_084_???_LL.fits OBJECT MJD EXPTIME DARKTIME TRAJCRA TRAJCDEC PARANGLE

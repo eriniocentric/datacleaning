@@ -1,0 +1,10 @@
+cat $1 | while read line
+do
+	echo "Date is $line"
+	cd /work/05350/ecooper/maverick/scripts
+	~gebhardt/bin/rsetup $line
+	cd /work/05350/ecooper/maverick/red1
+	cp /work/05350/ecooper/maverick/scripts/rtwi$line* .
+        cp /work/05350/ecooper/maverick/scripts/allscripts/$line/rscin* .
+        cp /work/05350/ecooper/maverick/scripts/allscripts/$line/r*.batch .
+done

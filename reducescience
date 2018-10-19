@@ -1,0 +1,7 @@
+cat $1 | while read line
+do
+	echo "Date is $line"
+	cp /work/05350/ecooper/maverick/scripts/allscripts/$line/rscin* .
+	cp /work/05350/ecooper/maverick/scripts/allscripts/$line/r*.batch .
+#	r$line.batch
+done

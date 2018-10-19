@@ -1,0 +1,15 @@
+awk '{if($4<1) print "checkpos",$2,$3,3,3727.*(1+$4),50,$6,"OII"}' zcosmos_hetdexinterest.txt > runOIIemitters
+awk '{if($4>1) print "checkpos",$2,$3,3,1216.*(1+$4),50,$6,"LAE"}' zcosmos_hetdexinterest.txt > runLAEemitters
+chmod a+x runOIIemitters
+chmod a+x runLAEemitters
+
+~ecooper/bin/test/jobsplitter runOIIemitters 100 1 '00:30:00'
+~ecooper/bin/test/jobsplitter runLAEemitters 100 1 '00:30:00'
+
+ls runOII*.slurm > rbatchOII
+sed -i s/^/'sbatch '/ rbatchOII
+ls runLAE*.slurm > rbatchLAE
+sed -i s/^/'sbatch '/ rbatchLAE
+
+chmod a+x rbatchOII
+chmod a+x rbatchLAE

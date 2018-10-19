@@ -1,0 +1,7 @@
+#bash script to take a list of date/shots [arg1] and make one large detection catalog [arg2] call for rsp1a2 $2
+if [ -e $2 ]; then rm $2; fi
+cat $1 | while read line
+do
+	echo "Date is $line"
+	awk -v date="$line" '{printf "rsp1a2 %s %s 2 %s 50 %04s %s %f %f %f\n",$19,$20,$5,$1,date,$27,$28,$29}' "$line"/res/t5all >> $2
+done
